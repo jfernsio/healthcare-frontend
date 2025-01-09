@@ -1,125 +1,268 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Clock, Trash2, Plus, Pill } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { format } from 'date-fns'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface MedicineReminder {
-  id: number;
-  name: string;
-  dosage: string;
-  description: string;
-  frequency: string;
+  _id: string
+  name: string
+  description: string
+  dosage: string
+  frequency: string
+  notifyAt: string
 }
-
-const frequencies = ['Daily', 'Weekly', 'Monthly']
 
 export default function MedicineRemindersPage() {
   const [reminders, setReminders] = useState<MedicineReminder[]>([])
-  const [newReminder, setNewReminder] = useState({ name: '', dosage: '', description: '', frequency: '' })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  
+  const [formData, setFormData] = useState({
+    medicineName: '',
+    description: '',
+    dosage: '',
+    frequency: '',
+    notifyAt: ''
+  })
 
-  const addReminder = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (newReminder.name && newReminder.dosage && newReminder.frequency) {
-      setReminders([...reminders, { ...newReminder, id: Date.now() }])
-      setNewReminder({ name: '', dosage: '', description: '', frequency: '' })
+  // Fetch reminders on component mount
+  useEffect(() => {
+    fetchReminders()
+  }, [])
+
+  const fetchReminders = async () => {
+    try {
+      const response = await fetch('https://healthcare-api-production-1930.up.railway.app/api/med/reminder', {
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch reminders')
+      }
+      
+      const data = await response.json()
+      setReminders(data)
+    } catch (err: any) {
+      setError('Failed to load medicine reminders')
+      console.error(err)
     }
   }
 
-  const deleteReminder = (id: number) => {
-    setReminders(reminders.filter(reminder => reminder.id !== id))
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('https://healthcare-api-production-1930.up.railway.app/api/reminder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create reminder')
+      }
+
+      // Reset form and refresh reminders
+      setFormData({
+        medicineName: '',
+        description: '',
+        dosage: '',
+        frequency: '',
+        notifyAt: ''
+      })
+      setShowForm(false)
+      fetchReminders()
+    } catch (err: any) {
+      setError(err.message || 'Failed to create reminder')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDelete = async (medId: string) => {
+    try {
+      const response = await fetch(`https://healthcare-api-production-1930.up.railway.app/api/del/med/reminder/${medId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete reminder')
+      }
+
+      // Remove reminder from state
+      setReminders(prev => prev.filter(rem => rem._id !== medId))
+    } catch (err: any) {
+      setError('Failed to delete reminder')
+      console.error(err)
+    }
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-blue-800 mb-6">Medicine Reminders</h1>
-      
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Add New Medicine Reminder</CardTitle>
-          <CardDescription>Set up a new medicine reminder</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={addReminder} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Medicine Name</Label>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-blue-800">Medicine Reminders</h1>
+        <Button 
+          onClick={() => setShowForm(!showForm)}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          New Reminder
+        </Button>
+      </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      {showForm && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Create New Medicine Reminder</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="medicineName">Medicine Name</Label>
                 <Input
-                  id="name"
-                  value={newReminder.name}
-                  onChange={(e) => setNewReminder({...newReminder, name: e.target.value})}
+                  id="medicineName"
                   required
+                  value={formData.medicineName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, medicineName: e.target.value }))}
                 />
               </div>
-              <div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description/Notes</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="dosage">Dosage</Label>
                 <Input
                   id="dosage"
-                  value={newReminder.dosage}
-                  onChange={(e) => setNewReminder({...newReminder, dosage: e.target.value})}
                   required
+                  placeholder="e.g., 1 tablet"
+                  value={formData.dosage}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dosage: e.target.value }))}
                 />
               </div>
-              <div>
+
+              <div className="space-y-2">
                 <Label htmlFor="frequency">Frequency</Label>
-                <Select 
-                  onValueChange={(value) => setNewReminder({...newReminder, frequency: value})}
-                  required
+                <Select
+                  value={formData.frequency}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, frequency: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {frequencies.map((freq) => (
-                      <SelectItem key={freq} value={freq}>{freq}</SelectItem>
-                    ))}
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="twice_daily">Twice Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={newReminder.description}
-                  onChange={(e) => setNewReminder({...newReminder, description: e.target.value})}
-                  className="h-24"
+
+              <div className="space-y-2">
+                <Label htmlFor="notifyAt">Reminder Time</Label>
+                <Input
+                  id="notifyAt"
+                  type="datetime-local"
+                  required
+                  value={formData.notifyAt}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notifyAt: e.target.value }))}
                 />
               </div>
-            </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-              <Plus className="mr-2 h-4 w-4" /> Add Reminder
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {reminders.map(reminder => (
-          <Card key={reminder.id}>
-            <CardHeader>
-              <CardTitle>{reminder.name}</CardTitle>
-              <CardDescription>{reminder.dosage} - {reminder.frequency}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">{reminder.description}</p>
+              <div className="flex gap-2">
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Creating...' : 'Create Reminder'}
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowForm(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {reminders.map((reminder) => (
+          <Card key={reminder._id} className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-semibold text-lg text-blue-800 flex items-center">
+                    <Pill className="h-5 w-5 mr-2" />
+                    {reminder.name}
+                  </h3>
+                  <p className="text-sm text-blue-600">{reminder.dosage}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleDelete(reminder._id)}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+              </div>
+              
+              <p className="text-gray-600 mt-2">{reminder.description}</p>
+              
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center text-gray-600">
+                  <Clock className="h-4 w-4 mr-2" />
+                  {format(new Date(reminder.notifyAt), 'PPp')}
+                </div>
+                
+                <div className="text-sm text-gray-600">
+                  Frequency: {reminder.frequency.replace('_', ' ')}
+                </div>
+              </div>
             </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={() => deleteReminder(reminder.id)} 
-                variant="destructive"
-                className="w-full"
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </Button>
-            </CardFooter>
           </Card>
         ))}
       </div>
+
+      {reminders.length === 0 && !isLoading && (
+        <div className="text-center text-gray-600 mt-8">
+          No medicine reminders set. Create one to get started!
+        </div>
+      )}
     </div>
   )
 }

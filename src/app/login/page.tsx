@@ -14,23 +14,52 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { login } = useAuth()
   const router = useRouter()
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // In a real application, you would validate the user's credentials here
-    // For this example, we'll just log in with some mock data
-    login({
-      id: '1',
-      name: 'John Doe',
-      email: email,
-      age: 30,
-      height: 180,
-      weight: 75,
-      bloodType: 'A+'
-    })
-    router.push('/profile')
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('https://healthcare-api-production-1930.up.railway.app/api/login/user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for cookies
+        body: JSON.stringify({
+          email,
+          password
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed')
+      }
+
+      // Update auth context and redirect
+      login({
+        id: data._id,
+        name: data.name,
+        email: data.email,
+        age: data.age,
+        height: data.height,
+        weight: data.weight,
+        bloodType: data.bloodType,
+      })
+      
+      router.push('/profile') // or your dashboard route
+    } catch (err: any) {
+      setError(err.message || 'Failed to login')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -45,6 +74,12 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                  {error}
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input 
@@ -75,8 +110,13 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                <LogIn className="mr-2 h-4 w-4" /> Log In
+              <Button 
+                type="submit" 
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={isLoading}
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                {isLoading ? 'Logging in...' : 'Log In'}
               </Button>
             </div>
           </form>

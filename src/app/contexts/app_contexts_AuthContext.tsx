@@ -1,44 +1,44 @@
 'use client'
 
-import React, { createContext, useState, useContext, useEffect } from 'react'
+import { createContext, useContext, useState, ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface User {
-  id: string;
-  name: string;
   email: string;
-  age: number;
-  height: number;
-  weight: number;
-  bloodType: string;
+  name?: string;
+  id?: string;
+  isAuthenticated: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (user: User) => void;
+  login: (userData: User) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-
-  useEffect(() => {
-    // Check if user data exists in localStorage
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-  }, [])
+  const router = useRouter()
 
   const login = (userData: User) => {
     setUser(userData)
-    localStorage.setItem('user', JSON.stringify(userData))
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('user')
+  const logout = async () => {
+    try {
+      // Clear the cookie
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+      
+      // Clear user state
+      setUser(null)
+      
+      // Redirect to login page
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   return (
@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   )
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider')
