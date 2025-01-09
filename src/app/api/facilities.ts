@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server'
 
-export async function POST(request: Request) {
+export async function getFacilities({ latitude, longitude, type }: {
+  latitude: number;
+  longitude: number;
+  type?: string;
+}) {
   try {
-    const body = await request.json()
-    const { latitude, longitude, type } = body
+    const response = await fetch(`https://healthcare-api-production-1930.up.railway.app/api/facilities`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
 
-    // Add your backend logic here
-    // Example: const facilities = await db.query(...)
+    if (!response.ok) {
+      throw new Error('Failed to fetch facilities');
+    }
 
-    return NextResponse.json(facilities)
+    const data = await response.json();
+    return data;
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch facilities' },
-      { status: 500 }
-    )
+    console.error('Error fetching facilities:', error);
+    throw error;
   }
 }

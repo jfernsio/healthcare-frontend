@@ -45,13 +45,10 @@ export default function LoginPage() {
 
       // Update auth context and redirect
       login({
+        email: data.email,
+        isAuthenticated: true,
         id: data._id,
         name: data.name,
-        email: data.email,
-        age: data.age,
-        height: data.height,
-        weight: data.weight,
-        bloodType: data.bloodType,
       })
       
       router.push('/profile') // or your dashboard route
